@@ -3,19 +3,26 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
 import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
-import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { CognitoUserPool, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js'
+import awsConfiguration from '../../config/awsConfigration';
 
 const theme = createTheme();
 
+const userPool = new CognitoUserPool({
+  UserPoolId: awsConfiguration.UserPoolId,
+  ClientId: awsConfiguration.ClientId,
+})
+
 export default function SignIn() {
+
+  const [signInStatus, setSignInStatus] = React.useState(false);
+  const [userName, setUserName] = React.useState('');
+
   const handleSubmit = (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -24,8 +31,63 @@ export default function SignIn() {
       email: data.get('email'),
       password: data.get('password'),
     });
+
+    const autheticattionData = {
+      Username: data.get('email'),
+      Password: data.get('password')
+    }
+    const autheticattionDetails = new AuthenticationDetails(autheticattionData);
+
+    const userData = {
+      Username: data.get('email'),
+      Pool: userPool
+    }
+
+    const cognitoUser = new CognitoUser(userData);
+
+    cognitoUser.authenticateUser(autheticattionDetails, {
+      onSuccess: (result) => {
+        const idToken = result.getIdToken().getJwtToken();          // IDトークン
+        const accessToken = result.getAccessToken().getJwtToken();  // アクセストークン
+        const refreshToken = result.getRefreshToken().getToken();   // 更新トークン
+        console.log("idToken : " + idToken);
+        console.log("accessToken : " + accessToken);
+        console.log("refreshToken : " + refreshToken);
+        setSignInStatus(true);
+        console.log(signInStatus);
+        displayUserName();
+      }, 
+      onFailure: (error) => {
+        console.log(error);
+        setSignInStatus(false);
+      }
+    })
+    displayUserName()
   };
 
+  const displayUserName = () => {
+    if (signInStatus) {
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        cognitoUser.getSession((error, session) => {
+          if (error) {
+            console.log(error);
+          } else {
+            cognitoUser.getUserAttributes((error, result) => {
+              if (error) {
+                console.log(error);
+              } else {
+                for (let i = 0; i < result.length; i++){
+                  console.log(JSON.stringify(result[i]));
+                }
+              }
+            })
+          }
+        })
+      }
+    }  
+  }
+  
   return (
     <ThemeProvider theme={theme}>
       <Container component="main" maxWidth="xs">
@@ -65,10 +127,6 @@ export default function SignIn() {
               id="password"
               autoComplete="current-password"
             />
-            <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
-              label="Remember me"
-            />
             <Button
               type="submit"
               fullWidth
@@ -77,18 +135,6 @@ export default function SignIn() {
             >
               Sign In
             </Button>
-            <Grid container>
-              <Grid item xs>
-                <Link href="#" variant="body2">
-                  Forgot password?
-                </Link>
-              </Grid>
-              <Grid item>
-                <Link href="#" variant="body2">
-                  {"Don't have an account? Sign Up"}
-                </Link>
-              </Grid>
-            </Grid>
           </Box>
         </Box>
       </Container>

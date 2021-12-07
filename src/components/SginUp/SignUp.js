@@ -3,16 +3,13 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
 import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { CognitoUserPool, CognitoUserAttribute } from 'amazon-cognito-identity-js'
+import { CognitoUserPool, CognitoUserAttribute, CognitoUser } from 'amazon-cognito-identity-js'
 import awsConfiguration from '../../config/awsConfigration';
 
 const theme = createTheme();
@@ -24,8 +21,8 @@ const userPool = new CognitoUserPool({
 
 export default function SignUp() {
 
-  const [error, setError] = React.useState('');
-  const [success, setSuccess] = React.useState('');
+  const [signUpStatus, setSignUpStatus] = React.useState(false);
+  const [activateStatus, setActivateStatus] = React.useState(false)
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -53,21 +50,35 @@ export default function SignUp() {
       null, 
       (err) => {
         if (err) {
-          setError('ERROR');
+          setSignUpStatus(false);
           return;
         }
-        console.log('success');
-        setSuccess('SUCCESS')
+        setSignUpStatus(true);
       }
     );
   };
 
   const activateUser = (event) => {
     event.preventDefault();
-    
+    const data = new FormData(event.currentTarget);
+    const userDataForActivation = {
+      Username : data.get('email'),
+      Pool : userPool
+    };
+    const cognitoUser = new CognitoUser(userDataForActivation);
+    cognitoUser.confirmRegistration(data.get('code'),
+      true,
+      (err) => {
+        if (err) {
+          setActivateStatus(false);
+          return;
+        }
+        setActivateStatus(true);
+      })
+      window.alert('ユーザー認証' + activateStatus);
   }
 
-  if (!error && !success){
+  if (!signUpStatus){
     return (
       <ThemeProvider theme={theme}>
         <Container component="main" maxWidth="xs">
@@ -130,12 +141,6 @@ export default function SignUp() {
                     autoComplete="new-password"
                   />
                 </Grid>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={<Checkbox value="allowExtraEmails" color="primary" />}
-                    label="I want to receive inspiration, marketing promotions and updates via email."
-                  />
-                </Grid>
               </Grid>
               <Button
                 type="submit"
@@ -145,20 +150,13 @@ export default function SignUp() {
               >
                 Sign Up
               </Button>
-              <Grid container justifyContent="flex-end">
-                <Grid item>
-                  <Link href="#" variant="body2">
-                    Already have an account? Sign in
-                  </Link>
-                </Grid>
-              </Grid>
             </Box>
           </Box>
         </Container>
       </ThemeProvider>
     );
   }
-  if (success === 'SUCCESS') {
+  if (signUpStatus) {
     return (
     
       <ThemeProvider theme={theme}>
@@ -191,13 +189,9 @@ export default function SignUp() {
               required
               fullWidth
               name="code"
-              label="code"
+              label="Activation Code"
               type="text"
               id="code"
-            />
-            <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
-              label="Remember me"
             />
             <Button
               type="submit"
